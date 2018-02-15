@@ -3,7 +3,9 @@ package com.example.aaronjags.animations;
 import android.animation.TimeAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
+import android.graphics.PathEffect;
 import android.graphics.drawable.Drawable;
 import android.support.v4.content.ContextCompat;
 import android.util.AttributeSet;
@@ -28,18 +30,13 @@ public class FigureAnimationView extends View {
         private float centerX;
         private float centerY;
         private int lifeTime;
+        private boolean invertedTrack;
     }
 
-    private static class Dot {
-        private float x = 0;
-        private float y = 0;
-        private float radius = 0;
-        private float theta = 0;
-    }
-
-    Paint paint = new Paint();
-    private Dot[] mDots = new Dot[360];
-    private Dot[] mDots2 = new Dot[360];
+    Paint circle_paint1 = new Paint();
+    Paint circle_paint2 = new Paint();
+    Paint arc_paint = new Paint();
+    float globalTheta = 0;
 
     /**
      * The TimeAnimator doesn’t actually animate anything itself.
@@ -51,7 +48,7 @@ public class FigureAnimationView extends View {
     private TimeAnimator mTimeAnimator;
 
     // DP per Second
-    private static final float SPEED = 0.3f;
+    private static final float SPEED = 0.1f;
     private static final int COUNT = 20;
     private float mBaseSpeed;
     // Figure Size
@@ -115,8 +112,6 @@ public class FigureAnimationView extends View {
             initFigure(figure, width, height);
             mFigures[i] = figure;
         }
-
-        initDots();
     }
 
     /**
@@ -146,7 +141,7 @@ public class FigureAnimationView extends View {
                     if (!isLaidOut()) {
                         return;
                     }
-                    updateState(deltaTime);
+                    updateFigures(deltaTime);
                     updateDots(deltaTime);
                     invalidate();
                 }
@@ -207,9 +202,57 @@ public class FigureAnimationView extends View {
         final int viewHeight = getHeight();
         final int viewWidth = getWidth();
 
-        canvas.rotate(360 * -mDots[0].theta * 0.003f, viewWidth / 2, viewHeight / 2);
+        drawFigures(canvas, viewWidth, viewHeight);
         drawDots(canvas, viewWidth, viewHeight);
+    }
 
+    /**
+     * Drow the current Dots
+     *
+     * @param canvas canvas used to draw
+     */
+    private void drawDots(Canvas canvas, Integer viewWidth, Integer viewHeight) {
+
+        // Rotating the Circles
+        canvas.translate(0, dip2px(getContext(), 50));
+        canvas.rotate(360 * globalTheta * 0.003f, viewWidth / 2, viewHeight / 2);
+
+        /*
+        * Drawing Dotted circles
+        * */
+        int circleSize = 65;
+
+        circle_paint1.setStrokeWidth(5);
+        circle_paint1.setAntiAlias(false);
+        circle_paint1.setStyle(Paint.Style.STROKE);
+        circle_paint1.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 1.5f), dip2px(getContext(), 10)}, 0));
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize)), circle_paint1);
+
+        circle_paint2.setStrokeWidth(5);
+        circle_paint2.setAntiAlias(false);
+        circle_paint2.setStyle(Paint.Style.STROKE);
+        circle_paint2.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 1.5f), dip2px(getContext(), 5)}, 0));
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize + 5)), circle_paint2);
+
+        /*
+        * Drawing Arc circle
+        * */
+        arc_paint.setStrokeWidth(5);
+        arc_paint.setAntiAlias(false);
+        arc_paint.setStyle(Paint.Style.STROKE);
+        arc_paint.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 200), dip2px(getContext(), 100)}, 0));
+
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize + 33)), arc_paint);
+    }
+
+    /**
+     * Drow the current Dots
+     *
+     * @param canvas     canvas used to draw
+     * @param viewHeight current View height
+     * @param viewWidth  current View width
+     */
+    private void drawFigures(Canvas canvas, Integer viewWidth, Integer viewHeight) {
         for (final Figure figure : mFigures) {
             // Saving canvas state
             final int save = canvas.save();
@@ -234,47 +277,11 @@ public class FigureAnimationView extends View {
     }
 
     /**
-     * Drow the current Dots
-     *
-     * @param canvas canvas used to draw
-     * @param viewHeight current View height
-     * @param viewWidth current View width
-     */
-    private void drawDots(Canvas canvas, Integer viewWidth, Integer viewHeight) {
-
-        for (Dot dot : mDots) {
-            canvas.drawCircle(dot.x, dot.y, 4, paint);
-        }
-
-        for (Dot dot : mDots2) {
-            canvas.drawCircle(dot.x, dot.y, 4, paint);
-        }
-    }
-
-    /**
      * Modifies every Dot with the next position
      */
     private void updateDots(float deltaMs) {
-
-        final int viewWidth = getWidth();
-        final int viewHeight = getHeight();
         double step = 0.2f * Math.PI / 20;
-        float theta = mDots[0].theta;
-
-        for (Dot dot : mDots) {
-            dot.x = (float) ((viewWidth / 2) + (dot.radius * Math.cos(theta)));
-            dot.y = (float) ((viewHeight - (viewHeight / 2)) - (dot.radius * Math.sin(theta)));
-            dot.theta -= step;
-            theta -= step;
-        }
-
-        theta = mDots[0].theta;
-        for (Dot dot : mDots2) {
-            dot.x = (float) ((viewWidth / 2) + (dot.radius * Math.cos(theta)));
-            dot.y = (float) ((viewHeight - (viewHeight / 2)) - (dot.radius * Math.sin(theta)));
-            dot.theta -= step;
-            theta -= step;
-        }
+        globalTheta += step;
     }
 
     /**
@@ -284,7 +291,7 @@ public class FigureAnimationView extends View {
      * @link - https://gamedev.stackexchange.com/questions/9607/moving-an-object-in-a-circular-path
      * @link - https://www.mathopenref.com/coordcirclealgorithm.html
      */
-    private void updateState(float deltaMs) {
+    private void updateFigures(float deltaMs) {
 
         final float deltaSeconds = deltaMs / 1000f;
         final int viewWidth = getWidth();
@@ -306,7 +313,12 @@ public class FigureAnimationView extends View {
             double step = (figure.speed * deltaSeconds * 5) * Math.PI / 20;
             float new_x = (float) ((figure.centerX) + ((viewWidth / 3) * Math.cos(figure.theta)));
             float new_y = (float) ((figure.centerY) - ((viewWidth / 3) * Math.sin(figure.theta)));
-            figure.theta += step;
+
+            if(figure.invertedTrack){
+                figure.theta -= step;
+            }else{
+                figure.theta += step;
+            }
 
             // Setting the new (X,Y) position
             figure.y = new_y;
@@ -335,11 +347,6 @@ public class FigureAnimationView extends View {
 
         // Set the Image size
         figure.scale = SCALE_MIN + SCALE_MAX * mRnd.nextFloat();
-
-        // Set X, Y to a random value within the width and height of the view
-        figure.x = viewWidth * mRnd.nextFloat();
-        figure.y += viewHeight * mRnd.nextFloat();
-
         // The alpha is determined by the scale of the figure and a random multiplier.
         figure.alpha = ALPHA_SCALE_PART * figure.scale + ALPHA_RANDOM_PART * mRnd.nextFloat();
         // The bigger and brighter a figure is, the faster it moves
@@ -347,52 +354,31 @@ public class FigureAnimationView extends View {
         // angle that will be increased each loop
         figure.theta = 0;
 
+        // Set X, Y to a random value within the width and height of the view
+        figure.x = viewWidth * mRnd.nextFloat();
+        figure.y = viewHeight * mRnd.nextFloat();
+
         // Set the (X,Y) Circle Center (where the figure is gonna be moving through)
         figure.centerX = getWidth() * mRnd.nextFloat();
         figure.centerY = getHeight() * mRnd.nextFloat();
 
         // randomize the figure lifeTime between (1000 as Maximum) and (200 as minimum)
         figure.lifeTime = mRandom.nextInt(1000 - 200) + 200;
+        figure.invertedTrack = mRandom.nextBoolean();
     }
 
-    /**
-     * Initialize the dots
-     *
-     */
-    private void initDots() {
+    private int dip2px(Context context, float dipValue) {
+        final float scale = context.getResources().getDisplayMetrics().density;
+        return (int) (dipValue * scale + 0.5f);
+    }
 
-        int width = getWidth();
-        int height = getHeight();
-        double step = 0.02f * Math.PI / 20;
+    private int px2dip(Context context, float pxValue) {
+        final float scale = context.getResources().getDisplayMetrics().density;
+        return (int) (pxValue / scale + 0.5f);
+    }
 
-        double theta = 0;
-        float radius = width / 1.6f;
-
-        for (int i = 0; i < mDots.length; i++) {
-            Dot dot = new Dot();
-
-            dot.x = (float) ((width / 2) + (radius * Math.cos(theta)));
-            dot.y = (float) ((height - (height / 2)) - (radius * Math.sin(theta)));
-            dot.radius = radius;
-            dot.theta += step;
-            theta += step;
-
-            mDots[i] = dot;
-        }
-
-        theta = 0;
-        radius = width / 1.7f;
-
-        for (int i = 0; i < mDots2.length; i++) {
-            Dot dot = new Dot();
-
-            dot.x = (float) ((width / 2) + (radius * Math.cos(theta)));
-            dot.y = (float) ((height - (height / 2)) - (radius * Math.sin(theta)));
-            dot.radius = radius;
-            dot.theta += step;
-            theta += step;
-
-            mDots2[i] = dot;
-        }
+    private int sp2px(Context context, float spValue) {
+        final float fontScale = context.getResources().getDisplayMetrics().scaledDensity;
+        return (int) (spValue * fontScale + 0.5f);
     }
 }
