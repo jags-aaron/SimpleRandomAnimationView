@@ -3,6 +3,7 @@ package com.example.aaronjags.animations;
 import android.animation.TimeAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.support.v4.content.ContextCompat;
 import android.util.AttributeSet;
@@ -28,6 +29,17 @@ public class FigureAnimationView extends View {
         private float centerY;
         private int lifeTime;
     }
+
+    private static class Dot {
+        private float x = 0;
+        private float y = 0;
+        private float radius = 0;
+        private float theta = 0;
+    }
+
+    Paint paint = new Paint();
+    private Dot[] mDots = new Dot[360];
+    private Dot[] mDots2 = new Dot[360];
 
     /**
      * The TimeAnimator doesn’t actually animate anything itself.
@@ -103,39 +115,8 @@ public class FigureAnimationView extends View {
             initFigure(figure, width, height);
             mFigures[i] = figure;
         }
-    }
 
-    /**
-     * Renders all the figures every time they're modified
-     *
-     * @link - https://developer.android.com/reference/android/view/View.html#onDraw(android.graphics.Canvas)
-     * @link - https://developer.android.com/reference/android/graphics/Canvas.html#restoreToCount(int)
-     */
-    @Override
-    protected void onDraw(Canvas canvas) {
-        final int viewHeight = getHeight();
-
-        for (final Figure figure : mFigures) {
-            // Saving canvas state
-            final int save = canvas.save();
-
-            // Moving and rotating the canvas
-            canvas.translate(figure.x, figure.y);
-            final float progress = (figure.y) / viewHeight;
-            canvas.rotate(360 * progress);
-
-            // Setting Image size and alpha
-            final int size = Math.round(figure.scale * imageRealSize);
-            mDrawable.setBounds(-size, -size, size, size);
-            mDrawable.setAlpha(Math.round(255 * figure.alpha));
-
-            // Draw the figure to the canvas
-            mDrawable.draw(canvas);
-
-            // Restore the canvas to it's previous position and rotation
-            // Efficient way to pop any calls to save() that happened after the save count reached saveCount.
-            canvas.restoreToCount(save);
-        }
+        initDots();
     }
 
     /**
@@ -166,6 +147,7 @@ public class FigureAnimationView extends View {
                         return;
                     }
                     updateState(deltaTime);
+                    updateDots(deltaTime);
                     invalidate();
                 }
             });
@@ -211,6 +193,87 @@ public class FigureAnimationView extends View {
             // pause duration, which might cause a huge jank in the animation.
             // By setting the current play time, it will pick of where it left off.
             mTimeAnimator.setCurrentPlayTime(mCurrentPlayTime);
+        }
+    }
+
+    /**
+     * Renders all the figures every time they're modified
+     *
+     * @link - https://developer.android.com/reference/android/view/View.html#onDraw(android.graphics.Canvas)
+     * @link - https://developer.android.com/reference/android/graphics/Canvas.html#restoreToCount(int)
+     */
+    @Override
+    protected void onDraw(Canvas canvas) {
+        final int viewHeight = getHeight();
+        final int viewWidth = getWidth();
+
+        canvas.rotate(360 * -mDots[0].theta * 0.003f, viewWidth / 2, viewHeight / 2);
+        drawDots(canvas, viewWidth, viewHeight);
+
+        for (final Figure figure : mFigures) {
+            // Saving canvas state
+            final int save = canvas.save();
+
+            // Moving and rotating the canvas
+            canvas.translate(figure.x, figure.y);
+            final float progress = (figure.y) / viewHeight;
+            canvas.rotate(360 * progress);
+
+            // Setting Image size and alpha
+            final int size = Math.round(figure.scale * imageRealSize);
+            mDrawable.setBounds(-size, -size, size, size);
+            mDrawable.setAlpha(Math.round(255 * figure.alpha));
+
+            // Draw the figure to the canvas
+            mDrawable.draw(canvas);
+
+            // Restore the canvas to it's previous position and rotation
+            // Efficient way to pop any calls to save() that happened after the save count reached saveCount.
+            canvas.restoreToCount(save);
+        }
+    }
+
+    /**
+     * Drow the current Dots
+     *
+     * @param canvas canvas used to draw
+     * @param viewHeight current View height
+     * @param viewWidth current View width
+     */
+    private void drawDots(Canvas canvas, Integer viewWidth, Integer viewHeight) {
+
+        for (Dot dot : mDots) {
+            canvas.drawCircle(dot.x, dot.y, 4, paint);
+        }
+
+        for (Dot dot : mDots2) {
+            canvas.drawCircle(dot.x, dot.y, 4, paint);
+        }
+    }
+
+    /**
+     * Modifies every Dot with the next position
+     */
+    private void updateDots(float deltaMs) {
+
+        final int viewWidth = getWidth();
+        final int viewHeight = getHeight();
+        double step = 0.2f * Math.PI / 20;
+        float theta = mDots[0].theta;
+
+        for (Dot dot : mDots) {
+            dot.x = (float) ((viewWidth / 2) + (dot.radius * Math.cos(theta)));
+            dot.y = (float) ((viewHeight - (viewHeight / 2)) - (dot.radius * Math.sin(theta)));
+            dot.theta -= step;
+            theta -= step;
+        }
+
+        theta = mDots[0].theta;
+        for (Dot dot : mDots2) {
+            dot.x = (float) ((viewWidth / 2) + (dot.radius * Math.cos(theta)));
+            dot.y = (float) ((viewHeight - (viewHeight / 2)) - (dot.radius * Math.sin(theta)));
+            dot.theta -= step;
+            theta -= step;
         }
     }
 
@@ -290,5 +353,46 @@ public class FigureAnimationView extends View {
 
         // randomize the figure lifeTime between (1000 as Maximum) and (200 as minimum)
         figure.lifeTime = mRandom.nextInt(1000 - 200) + 200;
+    }
+
+    /**
+     * Initialize the dots
+     *
+     */
+    private void initDots() {
+
+        int width = getWidth();
+        int height = getHeight();
+        double step = 0.02f * Math.PI / 20;
+
+        double theta = 0;
+        float radius = width / 1.6f;
+
+        for (int i = 0; i < mDots.length; i++) {
+            Dot dot = new Dot();
+
+            dot.x = (float) ((width / 2) + (radius * Math.cos(theta)));
+            dot.y = (float) ((height - (height / 2)) - (radius * Math.sin(theta)));
+            dot.radius = radius;
+            dot.theta += step;
+            theta += step;
+
+            mDots[i] = dot;
+        }
+
+        theta = 0;
+        radius = width / 1.7f;
+
+        for (int i = 0; i < mDots2.length; i++) {
+            Dot dot = new Dot();
+
+            dot.x = (float) ((width / 2) + (radius * Math.cos(theta)));
+            dot.y = (float) ((height - (height / 2)) - (radius * Math.sin(theta)));
+            dot.radius = radius;
+            dot.theta += step;
+            theta += step;
+
+            mDots2[i] = dot;
+        }
     }
 }
