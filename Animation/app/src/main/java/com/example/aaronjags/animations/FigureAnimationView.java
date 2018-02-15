@@ -31,6 +31,7 @@ public class FigureAnimationView extends View {
         private float centerY;
         private int lifeTime;
         private boolean invertedTrack;
+        private boolean renewed = false;
     }
 
     Paint circle_paint1 = new Paint();
@@ -48,11 +49,11 @@ public class FigureAnimationView extends View {
     private TimeAnimator mTimeAnimator;
 
     // DP per Second
-    private static final float SPEED = 0.1f;
-    private static final int COUNT = 20;
+    private static final float SPEED = 0.04f;
+    private static final int COUNT = 13;
     private float mBaseSpeed;
     // Figure Size
-    private static final float SCALE_MIN = 0.2f;
+    private static final float SCALE_MIN = 0.1f;
     private static final float SCALE_MAX = 0.7f;
     private float imageRealSize;
     // Figure Alpha
@@ -214,35 +215,35 @@ public class FigureAnimationView extends View {
     private void drawDots(Canvas canvas, Integer viewWidth, Integer viewHeight) {
 
         // Rotating the Circles
-        canvas.translate(0, dip2px(getContext(), 50));
+        canvas.translate(0, dip2px(70));
         canvas.rotate(360 * globalTheta * 0.003f, viewWidth / 2, viewHeight / 2);
 
         /*
         * Drawing Dotted circles
         * */
-        int circleSize = 65;
+        int circleSize = 70;
 
         circle_paint1.setStrokeWidth(5);
         circle_paint1.setAntiAlias(false);
         circle_paint1.setStyle(Paint.Style.STROKE);
-        circle_paint1.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 1.5f), dip2px(getContext(), 10)}, 0));
-        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize)), circle_paint1);
+        circle_paint1.setPathEffect(new DashPathEffect(new float[]{dip2px(1.5f), dip2px(10)}, 0));
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(dip2px(circleSize)), circle_paint1);
 
         circle_paint2.setStrokeWidth(5);
         circle_paint2.setAntiAlias(false);
         circle_paint2.setStyle(Paint.Style.STROKE);
-        circle_paint2.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 1.5f), dip2px(getContext(), 5)}, 0));
-        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize + 5)), circle_paint2);
+        circle_paint2.setPathEffect(new DashPathEffect(new float[]{dip2px(1.5f), dip2px(5)}, 0));
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(dip2px(circleSize + 5)), circle_paint2);
 
         /*
         * Drawing Arc circle
         * */
-        arc_paint.setStrokeWidth(5);
+        arc_paint.setStrokeWidth(2);
         arc_paint.setAntiAlias(false);
         arc_paint.setStyle(Paint.Style.STROKE);
-        arc_paint.setPathEffect(new DashPathEffect(new float[]{dip2px(getContext(), 200), dip2px(getContext(), 100)}, 0));
+        arc_paint.setPathEffect(new DashPathEffect(new float[]{dip2px(240), dip2px(100)}, 0));
 
-        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(getContext(), dip2px(getContext(), circleSize + 33)), arc_paint);
+        canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(dip2px(circleSize + 35)), arc_paint);
     }
 
     /**
@@ -257,10 +258,15 @@ public class FigureAnimationView extends View {
             // Saving canvas state
             final int save = canvas.save();
 
+            // Ignore the Figure if it's renewed its values
+            if(figure.renewed){
+                figure.renewed = false;
+                continue;
+            }
+
             // Moving and rotating the canvas
             canvas.translate(figure.x, figure.y);
-            final float progress = (figure.y) / viewHeight;
-            canvas.rotate(360 * progress);
+            canvas.rotate(360 * figure.theta * figure.scale);
 
             // Setting Image size and alpha
             final int size = Math.round(figure.scale * imageRealSize);
@@ -293,7 +299,7 @@ public class FigureAnimationView extends View {
      */
     private void updateFigures(float deltaMs) {
 
-        final float deltaSeconds = deltaMs / 1000f;
+        final float deltaSeconds = deltaMs / 100f;
         final int viewWidth = getWidth();
         final int viewHeight = getHeight();
 
@@ -310,9 +316,9 @@ public class FigureAnimationView extends View {
              * var new_x = h + r * Math.cos(theta);
              * var new_y = k - r * Math.sin(theta);
              */
-            double step = (figure.speed * deltaSeconds * 5) * Math.PI / 20;
-            float new_x = (float) ((figure.centerX) + ((viewWidth / 3) * Math.cos(figure.theta)));
-            float new_y = (float) ((figure.centerY) - ((viewWidth / 3) * Math.sin(figure.theta)));
+            double step = (figure.speed * deltaSeconds) * Math.PI / 20;
+            figure.y = (float) ((figure.centerX) + ((viewWidth / 2) * Math.cos(figure.theta)));
+            figure.x = (float) ((figure.centerY) - ((viewWidth / 2) * Math.sin(figure.theta)));
 
             if(figure.invertedTrack){
                 figure.theta -= step;
@@ -320,15 +326,13 @@ public class FigureAnimationView extends View {
                 figure.theta += step;
             }
 
-            // Setting the new (X,Y) position
-            figure.y = new_y;
-            figure.x = new_x;
             // Removing Figure lifeTime
             figure.lifeTime -= 1;
 
             // updating figure when it's lifeTime has finished
             if (figure.lifeTime < 0) {
                 figure.lifeTime = 0;
+                figure.renewed = true;
                 initFigure(figure, viewWidth, viewHeight);
             }
         }
@@ -367,18 +371,21 @@ public class FigureAnimationView extends View {
         figure.invertedTrack = mRandom.nextBoolean();
     }
 
-    private int dip2px(Context context, float dipValue) {
-        final float scale = context.getResources().getDisplayMetrics().density;
+    /**
+     * @param dipValue value to be transformed to pixel
+     * */
+    private int dip2px(float dipValue) {
+        final float scale = getResources().getDisplayMetrics().density;
         return (int) (dipValue * scale + 0.5f);
     }
 
-    private int px2dip(Context context, float pxValue) {
-        final float scale = context.getResources().getDisplayMetrics().density;
+    private int px2dip(float pxValue) {
+        final float scale = getResources().getDisplayMetrics().density;
         return (int) (pxValue / scale + 0.5f);
     }
 
-    private int sp2px(Context context, float spValue) {
-        final float fontScale = context.getResources().getDisplayMetrics().scaledDensity;
+    private int sp2px(float spValue) {
+        final float fontScale = getResources().getDisplayMetrics().scaledDensity;
         return (int) (spValue * fontScale + 0.5f);
     }
 }
