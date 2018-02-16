@@ -49,12 +49,12 @@ public class FigureAnimationView extends View {
     private TimeAnimator mTimeAnimator;
 
     // DP per Second
-    private static final float SPEED = 0.04f;
-    private static final int COUNT = 13;
+    private static final float SPEED = 0.02f;
+    private static final int COUNT = 15;
     private float mBaseSpeed;
     // Figure Size
     private static final float SCALE_MIN = 0.1f;
-    private static final float SCALE_MAX = 0.7f;
+    private static final float SCALE_MAX = 0.8f;
     private float imageRealSize;
     // Figure Alpha
     private static final float ALPHA_SCALE_PART = 0.4f;
@@ -90,7 +90,7 @@ public class FigureAnimationView extends View {
         mDrawable = ContextCompat.getDrawable(getContext(), R.mipmap.ic_launcher);
         // Measure
         imageRealSize = Math.max(mDrawable != null ? mDrawable.getIntrinsicWidth() : 0, mDrawable != null ? mDrawable.getIntrinsicHeight() : 0) / 2f;
-        // Get
+        // Get the speed based on screen density
         mBaseSpeed = SPEED * getResources().getDisplayMetrics().density;
     }
 
@@ -110,7 +110,7 @@ public class FigureAnimationView extends View {
         // Setting initial values to figures
         for (int i = 0; i < mFigures.length; i++) {
             final Figure figure = new Figure();
-            initFigure(figure, width, height);
+            initFigure(figure);
             mFigures[i] = figure;
         }
     }
@@ -143,7 +143,7 @@ public class FigureAnimationView extends View {
                         return;
                     }
                     updateFigures(deltaTime);
-                    updateDots(deltaTime);
+                    updateDots();
                     invalidate();
                 }
             });
@@ -242,7 +242,6 @@ public class FigureAnimationView extends View {
         arc_paint.setAntiAlias(false);
         arc_paint.setStyle(Paint.Style.STROKE);
         arc_paint.setPathEffect(new DashPathEffect(new float[]{dip2px(240), dip2px(100)}, 0));
-
         canvas.drawCircle(viewWidth / 2, viewHeight / 2, dip2px(dip2px(circleSize + 35)), arc_paint);
     }
 
@@ -259,7 +258,7 @@ public class FigureAnimationView extends View {
             final int save = canvas.save();
 
             // Ignore the Figure if it's renewed its values
-            if(figure.renewed){
+            if (figure.renewed) {
                 figure.renewed = false;
                 continue;
             }
@@ -285,7 +284,7 @@ public class FigureAnimationView extends View {
     /**
      * Modifies every Dot with the next position
      */
-    private void updateDots(float deltaMs) {
+    private void updateDots() {
         double step = 0.2f * Math.PI / 20;
         globalTheta += step;
     }
@@ -317,12 +316,12 @@ public class FigureAnimationView extends View {
              * var new_y = k - r * Math.sin(theta);
              */
             double step = (figure.speed * deltaSeconds) * Math.PI / 20;
-            figure.y = (float) ((figure.centerX) + ((viewWidth / 2) * Math.cos(figure.theta)));
-            figure.x = (float) ((figure.centerY) - ((viewWidth / 2) * Math.sin(figure.theta)));
+            figure.x = (float) ((figure.centerX) + ((viewWidth / 2) * Math.cos(figure.theta)));
+            figure.y = (float) ((figure.centerY) - ((viewWidth / 2) * Math.sin(figure.theta)));
 
-            if(figure.invertedTrack){
+            if (figure.invertedTrack) {
                 figure.theta -= step;
-            }else{
+            } else {
                 figure.theta += step;
             }
 
@@ -333,7 +332,7 @@ public class FigureAnimationView extends View {
             if (figure.lifeTime < 0) {
                 figure.lifeTime = 0;
                 figure.renewed = true;
-                initFigure(figure, viewWidth, viewHeight);
+                initFigure(figure);
             }
         }
     }
@@ -341,11 +340,9 @@ public class FigureAnimationView extends View {
     /**
      * Initialize the given figure by randomizing it's position, scale and alpha
      *
-     * @param figure     the figure to initialize
-     * @param viewWidth  the view width
-     * @param viewHeight the view height
+     * @param figure the figure to initialize
      */
-    private void initFigure(Figure figure, int viewWidth, int viewHeight) {
+    private void initFigure(Figure figure) {
 
         Random mRandom = new Random();
 
@@ -359,33 +356,38 @@ public class FigureAnimationView extends View {
         figure.theta = 0;
 
         // Set X, Y to a random value within the width and height of the view
-        figure.x = viewWidth * mRnd.nextFloat();
-        figure.y = viewHeight * mRnd.nextFloat();
+        figure.x = mRandom.nextInt(getWidth());
+        figure.y = mRandom.nextInt(getHeight());
 
-        // Set the (X,Y) Circle Center (where the figure is gonna be moving through)
-        figure.centerX = getWidth() * mRnd.nextFloat();
-        figure.centerY = getHeight() * mRnd.nextFloat();
+        /*
+         * Set the (X,Y) Circle Center (where the figure is gonna be moving through)
+         * (I'm avoiding to draw in the middle X, cuz the card is gonna be obstructing, I draw starting -10 to 10)
+         * ---> NOTE: X = 0 is the center {I don't know why hehe, but I will search about it, I promise}
+         * - X goes from -150dp to 150dp as maximum and -10dp to 10dp minimum
+         * - Y goes from 80dp to 400dp
+        */
+        figure.centerX = (dip2px(mRandom.nextInt(150 - 10) + 10) * (mRandom.nextBoolean() ? 1 : -1));
+        figure.centerY = dip2px(mRandom.nextInt(400 - 80) + 80);
 
-        // randomize the figure lifeTime between (1000 as Maximum) and (200 as minimum)
-        figure.lifeTime = mRandom.nextInt(1000 - 200) + 200;
+        // randomize the figure lifeTime
+        figure.lifeTime = mRandom.nextInt(3000 - 2000) + 1000;
+        // This changes the figure animation (left or right direction)
         figure.invertedTrack = mRandom.nextBoolean();
     }
 
     /**
      * @param dipValue value to be transformed to pixel
-     * */
+     */
     private int dip2px(float dipValue) {
         final float scale = getResources().getDisplayMetrics().density;
         return (int) (dipValue * scale + 0.5f);
     }
 
+    /**
+     * @param pxValue value to be transformed to dip
+     */
     private int px2dip(float pxValue) {
         final float scale = getResources().getDisplayMetrics().density;
         return (int) (pxValue / scale + 0.5f);
-    }
-
-    private int sp2px(float spValue) {
-        final float fontScale = getResources().getDisplayMetrics().scaledDensity;
-        return (int) (spValue * fontScale + 0.5f);
     }
 }
