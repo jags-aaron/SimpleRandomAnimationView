@@ -9,6 +9,7 @@ import android.graphics.PathEffect;
 import android.graphics.drawable.Drawable;
 import android.support.v4.content.ContextCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.util.Random;
@@ -32,6 +33,7 @@ public class FigureAnimationView extends View {
         private int lifeTime;
         private boolean invertedTrack;
         private boolean renewed = false;
+        private float maximumSize;
     }
 
     Paint circle_paint1 = new Paint();
@@ -49,12 +51,12 @@ public class FigureAnimationView extends View {
     private TimeAnimator mTimeAnimator;
 
     // DP per Second
-    private static final float SPEED = 0.02f;
-    private static final int COUNT = 15;
+    private static final float SPEED = 0.01f;
+    private static final int COUNT = 10;
     private float mBaseSpeed;
     // Figure Size
     private static final float SCALE_MIN = 0.1f;
-    private static final float SCALE_MAX = 0.8f;
+    private static final float SCALE_MAX = 0.9f;
     private float imageRealSize;
     // Figure Alpha
     private static final float ALPHA_SCALE_PART = 0.4f;
@@ -63,6 +65,8 @@ public class FigureAnimationView extends View {
     private final Figure[] mFigures = new Figure[COUNT];
     // Random object
     private final Random mRnd = new Random(1500);
+    // Fade Out/In speed
+    private static final float FADE_IN_OUT_SPEED = 0.05f;
 
     private Drawable mDrawable;
     private long mCurrentPlayTime;
@@ -109,9 +113,7 @@ public class FigureAnimationView extends View {
 
         // Setting initial values to figures
         for (int i = 0; i < mFigures.length; i++) {
-            final Figure figure = new Figure();
-            initFigure(figure);
-            mFigures[i] = figure;
+            mFigures[i] = initFigure(new Figure());
         }
     }
 
@@ -253,9 +255,10 @@ public class FigureAnimationView extends View {
      * @param viewWidth  current View width
      */
     private void drawFigures(Canvas canvas, Integer viewWidth, Integer viewHeight) {
-        for (final Figure figure : mFigures) {
+
+        for (Figure figure : mFigures) {
             // Saving canvas state
-            final int save = canvas.save();
+            int save = canvas.save();
 
             // Ignore the Figure if it's renewed its values
             if (figure.renewed) {
@@ -265,10 +268,11 @@ public class FigureAnimationView extends View {
 
             // Moving and rotating the canvas
             canvas.translate(figure.x, figure.y);
-            canvas.rotate(360 * figure.theta * figure.scale);
+            canvas.rotate(360 * figure.theta * figure.alpha);
 
             // Setting Image size and alpha
-            final int size = Math.round(figure.scale * imageRealSize);
+            int size = Math.round(figure.scale * imageRealSize);
+
             mDrawable.setBounds(-size, -size, size, size);
             mDrawable.setAlpha(Math.round(255 * figure.alpha));
 
@@ -302,7 +306,12 @@ public class FigureAnimationView extends View {
         final int viewWidth = getWidth();
         final int viewHeight = getHeight();
 
-        for (final Figure figure : mFigures) {
+        for (Figure figure : mFigures) {
+
+            if (figure.theta == 0) {
+                figure.maximumSize = figure.scale;
+                figure.scale = 0;
+            }
 
             /*
              * Implementing the Parametric equation of a circle
@@ -328,12 +337,23 @@ public class FigureAnimationView extends View {
             // Removing Figure lifeTime
             figure.lifeTime -= 1;
 
-            // updating figure when it's lifeTime has finished
-            if (figure.lifeTime < 0) {
-                figure.lifeTime = 0;
-                figure.renewed = true;
-                initFigure(figure);
+            // FADE IN
+            if (figure.scale < figure.maximumSize && figure.lifeTime > 0) {
+                figure.scale += FADE_IN_OUT_SPEED;
             }
+
+            if (figure.lifeTime <= 0) {
+                // FADE OUT
+                figure.scale -= FADE_IN_OUT_SPEED;
+                if (figure.scale <= 0) {
+                    figure.lifeTime = 0;
+                    figure.scale = 0;
+                    figure.renewed = true;
+                    // updating figure when it's lifeTime has finished
+                    initFigure(figure);
+                }
+            }
+
         }
     }
 
@@ -342,12 +362,13 @@ public class FigureAnimationView extends View {
      *
      * @param figure the figure to initialize
      */
-    private void initFigure(Figure figure) {
+    private Figure initFigure(Figure figure) {
 
         Random mRandom = new Random();
 
         // Set the Image size
         figure.scale = SCALE_MIN + SCALE_MAX * mRnd.nextFloat();
+        figure.maximumSize = 0;
         // The alpha is determined by the scale of the figure and a random multiplier.
         figure.alpha = ALPHA_SCALE_PART * figure.scale + ALPHA_RANDOM_PART * mRnd.nextFloat();
         // The bigger and brighter a figure is, the faster it moves
@@ -363,16 +384,17 @@ public class FigureAnimationView extends View {
          * Set the (X,Y) Circle Center (where the figure is gonna be moving through)
          * (I'm avoiding to draw in the middle X, cuz the card is gonna be obstructing, I draw starting -10 to 10)
          * ---> NOTE: X = 0 is the center {I don't know why hehe, but I will search about it, I promise}
-         * - X goes from -150dp to 150dp as maximum and -10dp to 10dp minimum
-         * - Y goes from 80dp to 400dp
+         * - X goes from -200dp to 200dp as maximum and -10dp to 10dp minimum
         */
-        figure.centerX = (dip2px(mRandom.nextInt(150 - 10) + 10) * (mRandom.nextBoolean() ? 1 : -1));
-        figure.centerY = dip2px(mRandom.nextInt(400 - 80) + 80);
+        figure.centerX = (dip2px(mRandom.nextInt(200 - 10) + 10) * (mRandom.nextBoolean() ? 1 : -1));
+        figure.centerY = mRandom.nextInt(getHeight());
 
         // randomize the figure lifeTime
-        figure.lifeTime = mRandom.nextInt(3000 - 2000) + 1000;
+        figure.lifeTime = mRandom.nextInt(3000 - 1000) + 1000;
         // This changes the figure animation (left or right direction)
         figure.invertedTrack = mRandom.nextBoolean();
+
+        return figure;
     }
 
     /**
